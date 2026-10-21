@@ -147,3 +147,63 @@ test('targets a more-replies disclosure without clicking composition controls', 
   expect((await extractPage(page)).evidence.renderedComments).toBe(4);
   expect(await page.locator('body').getAttribute('data-composition-opened')).toBeNull();
 });
+
+test('blocked reads offer local cleanup, honor cooldown and can retry manually', async ({
+  page,
+}) => {
+  const data = await extracted(page);
+  Object.assign(data, {
+    status: 'source_blocked',
+    message: 'Reddit blocked this browser.',
+    post: null,
+    comments: [],
+  });
+  data.evidence.renderedComments = 0;
+  await page.goto('/');
+  await page.clock.install();
+  let reads = 0;
+  await page.route('**/api/read', (route) => {
+    reads++;
+    return route.fulfill({ json: data, headers: { 'Retry-After': '15' } });
+  });
+  await page.getByLabel('Reddit thread or subreddit URL').fill(data.url);
+  await page.getByRole('button', { name: 'Read thread', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Reddit blocked this browser' })).toBeVisible();
+  await expect(
+    page.getByRole('link', { name: 'Get the local reader', exact: true }),
+  ).toHaveAttribute('href', '/threadglass.user.js');
+  const retry = page.getByRole('button', { name: 'Try reading again' });
+  await expect(retry).toBeDisabled();
+  expect(reads).toBe(1);
+  await page.clock.fastForward(16000);
+  await expect(retry).toBeEnabled();
+  expect(reads).toBe(1);
+  await retry.click();
+  await expect(retry).toBeDisabled();
+  expect(reads).toBe(2);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({
+    path: `artifacts/blocked-${test.info().project.name}.png`,
+    fullPage: true,
+  });
+});
+
+test('explicit login requirement does not offer cleanup or automatic retries', async ({ page }) => {
+  const data = await extracted(page);
+  Object.assign(data, {
+    status: 'login_required',
+    message: 'Reddit requires authentication.',
+    post: null,
+    comments: [],
+  });
+  data.evidence.renderedComments = 0;
+  await page.goto('/');
+  await page.route('**/api/read', (route) => route.fulfill({ json: data }));
+  await page.getByLabel('Reddit thread or subreddit URL').fill(data.url);
+  await page.getByRole('button', { name: 'Read thread', exact: true }).click();
+  const notice = page.getByRole('region', { name: 'Reading availability' });
+  await expect(notice.getByRole('heading', { name: 'Reddit requires access' })).toBeVisible();
+  await expect(notice.getByRole('link', { name: 'Open original on Reddit' })).toBeVisible();
+  await expect(notice.getByRole('link', { name: 'Get the local reader' })).toHaveCount(0);
+  await expect(notice.getByRole('button')).toHaveCount(0);
+});

@@ -42,6 +42,7 @@ function fakeBrowser() {
     setDefaultTimeout: vi.fn(),
     setDefaultNavigationTimeout: vi.fn(),
     mainFrame: vi.fn(),
+    url: vi.fn().mockReturnValue(input.url),
     goto: vi.fn().mockResolvedValue({ status: () => 403 }),
     waitForFunction: vi.fn().mockResolvedValue(null),
   };
@@ -137,6 +138,38 @@ describe('browser lifecycle', () => {
     ).rejects.toMatchObject({ code: 'invalid_url' });
     expect(mocks.resolve).not.toHaveBeenCalled();
     expect(mocks.launch).not.toHaveBeenCalled();
+    await service.close();
+  });
+  it.each([
+    'https://www.reddit.com/api/v1/me',
+    'https://www.reddit.com/login/',
+    'https://example.com/thread',
+  ])('refuses to extract an unsupported final destination %s', async (destination) => {
+    const f = fakeBrowser();
+    f.page.url.mockReturnValue(destination);
+    mocks.launch.mockResolvedValue(f.browser);
+    const service = new BrowserService();
+    await expect(service.read(input, new AbortController().signal)).rejects.toMatchObject({
+      code: 'unsupported_redirect',
+      httpStatus: 422,
+    });
+    expect(mocks.extract).not.toHaveBeenCalled();
+    expect(f.context.close).toHaveBeenCalled();
+    await service.close();
+  });
+  it('keeps a failed blank navigation classified as a network failure', async () => {
+    const f = fakeBrowser();
+    f.page.url.mockReturnValue('about:blank');
+    f.page.goto.mockRejectedValue(new Error('network unavailable'));
+    mocks.launch.mockResolvedValue(f.browser);
+    mocks.extract.mockImplementation(async () => ({
+      ...structuredClone(result),
+      status: 'render_failure',
+    }));
+    const service = new BrowserService();
+    expect((await service.read(input, new AbortController().signal)).status).toBe(
+      'network_failure',
+    );
     await service.close();
   });
 });

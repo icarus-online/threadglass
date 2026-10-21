@@ -13,3 +13,6 @@
 - Limits and cache are per process. A public multi-instance service needs upstream rate controls and infrastructure egress restrictions. The default Compose stack binds to loopback and has no public deployment or TLS certificate.
 - Persistent diagnostic retention is operator-managed. Default Compose diagnostics are ephemeral and bounded. Do not expose raw diagnostics publicly.
 - This is an early alpha with no independent security audit, broad browser-compatibility guarantee, or production uptime claim.
+
+- HTTP redirects are constrained by host/port/public-IP egress checks and final destination validation; Playwright does not provide an application route callback for every redirect hop. Do not treat supported initial paths as proof of pre-request path validation on every hop.
+- Source cooldowns may briefly repeat a blocked or failed snapshot (5–30 seconds), and public snapshots may be reused for 60 seconds. The original fetch time remains visible. There are no automatic retries.

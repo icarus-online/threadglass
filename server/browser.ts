@@ -151,6 +151,18 @@ export class BrowserService {
           { timeout: 7000 },
         )
         .catch(() => {});
+      // Playwright does not re-run route handlers for every HTTP redirect.
+      // Egress still restricts hosts/IPs; refuse to extract an unsupported final URL.
+      try {
+        if (!navError || !['about:blank', 'chrome-error://chromewebdata/'].includes(page.url()))
+          validateRedditUrl(page.url());
+      } catch {
+        throw new ReaderError(
+          'unsupported_redirect',
+          'Reddit redirected outside supported reader pages. Open the original to continue.',
+          422,
+        );
+      }
       stage = 'extract';
       let result = await extractPage(page);
       result.evidence = {
@@ -168,6 +180,16 @@ export class BrowserService {
           Math.min(8000, this.budgetMs - (Date.now() - started) - 2000),
           signal,
         );
+      try {
+        if (!navError || !['about:blank', 'chrome-error://chromewebdata/'].includes(page.url()))
+          validateRedditUrl(page.url());
+      } catch {
+        throw new ReaderError(
+          'unsupported_redirect',
+          'The discussion navigated outside supported reader pages. Open the original to continue.',
+          422,
+        );
+      }
       stage = 'extract';
       result = await extractPage(page);
       if (!result.post && !result.listing.length) {

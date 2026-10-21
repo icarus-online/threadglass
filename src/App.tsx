@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import DOMPurify from 'dompurify';
+import { AvailabilityNotice } from './Availability.tsx';
 import { validateRedditUrl } from '../shared/urls.ts';
 import type { Discussion, Post, Comment, ContentBlock, Media } from '../shared/schema.ts';
 type IconName =
@@ -190,7 +191,8 @@ export function App({
   const [data, setData] = useState<Discussion | null>(initial || null),
     [url, setUrl] = useState(''),
     [busy, setBusy] = useState(false),
-    [error, setError] = useState('');
+    [error, setError] = useState(''),
+    [retryAt, setRetryAt] = useState(0);
   const [theme, setTheme] = useState(() => storage('theme', 'light')),
     [bookmarks, setBookmarks] = useState<{ url: string; title: string }[]>(() =>
       storage('bookmarks', []),
@@ -220,6 +222,7 @@ export function App({
     const ac = new AbortController();
     controller.current = ac;
     setError('');
+    setRetryAt(0);
     setBusy(true);
     setUrl(value);
     try {
@@ -232,6 +235,11 @@ export function App({
       const json = await response.json();
       if (!response.ok)
         throw new Error(json.error?.message || 'The reader could not complete this request.');
+      if (ac.signal.aborted || controller.current !== ac) return;
+      const retry = Number(response.headers.get('Retry-After'));
+      setRetryAt(
+        Number.isFinite(retry) && retry > 0 ? Date.now() + Math.min(retry, 3600) * 1000 : 0,
+      );
       setData(json);
       setQuery('');
       requestAnimationFrame(() => resultRef.current?.focus());
@@ -456,10 +464,13 @@ export function App({
               </p>
             </aside>
             <div className="reading-main">
-              <div className={'availability ' + data.status} role="status">
-                <span className="status-dot" />
-                <span>{data.message}</span>
-              </div>
+              <AvailabilityNotice
+                data={data}
+                localMode={localMode}
+                busy={busy}
+                retryAt={retryAt}
+                onRetry={() => void read(data.url)}
+              />
               {data.warnings.map((w, i) => (
                 <p className="warning" key={i}>
                   {w}

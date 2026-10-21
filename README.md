@@ -25,12 +25,12 @@ The container runs as `pwuser`, keeps Chromium's sandbox enabled, uses Playwrigh
 ## What is included
 
 - Reusable real Chromium with independent, signed-out contexts for each request.
-- Two simultaneous reads, a 35-second total request budget, cancellation, cleanup, and replacement after a browser disconnect. Excess work receives a bounded `429 busy` response instead of an unbounded queue.
+- Two simultaneous browser jobs, shared work for identical URL/viewport requests, a 35-second cancellation budget, cleanup, and replacement after a browser disconnect. Excess work receives a bounded `429 busy` response instead of an unbounded queue.
 - A versioned DOM adapter for modern `shreddit-*` and legacy Reddit markup, including open shadow DOM. Comment parent relationships, deleted-author markers, timestamps, displayed scores, rich text, tables, code, and available media stay attached to their source.
 - Targeted dismissal of app-promotion controls and bounded comment expansion/scrolling. No blind clicking, authentication, voting, posting, CAPTCHA solving, or stealth behavior.
 - Dark mode, collapsible replies, search within loaded comments, top-level comment navigation, spoiler disclosures, media viewing, and device-local bookmarks.
 - A local userscript sharing the schema, adapter, and React reader. It reads already-loaded DOM without sending discussion content to a backend.
-- Source availability reporting, optional diagnostics, URL/DNS/redirect restrictions, HTML sanitization, rate limits, a small short-lived cache, Docker Compose, CI, and tests.
+- Source availability reporting with useful recovery steps and short retry cooldowns, optional diagnostics, URL/DNS/redirect restrictions, HTML sanitization, rate limits, a cache bounded by entry count and serialized size, Docker Compose, CI, and tests.
 
 ## Local development
 
@@ -84,6 +84,8 @@ The worker does not call Reddit's JSON endpoints, request API credentials, copy 
 ```
 
 It returns a versioned `Discussion` defined in [shared/schema.ts](shared/schema.ts). Source outcomes return structured data with an availability status, even when no content was retrieved. Invalid requests, busy workers, cancellation, and worker failures use structured HTTP errors. `GET /api/health` checks the HTTP service, not Reddit availability.
+
+Identical simultaneous reads share one browser job; cancelling one reader does not cancel another. Cached snapshots retain their original fetch time. `X-Threadglass-Cache` reports `miss`, `shared` or `hit`; `Retry-After` indicates a short cooldown for blocked/rate-limited/transient source outcomes. The reader offers a manual retry after that wait, the source link, and local-cleanup guidance where appropriate. An explicit login requirement does not offer cleanup as a way to unlock restricted content.
 
 ## Tests and live evidence
 
