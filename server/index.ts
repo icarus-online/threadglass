@@ -4,9 +4,11 @@ import { rateLimit } from 'express-rate-limit';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { BrowserService, ReaderError } from './browser.ts';
-import { readRequest, type Discussion } from '../shared/schema.ts';
+import { readRequest } from '../shared/schema.ts';
+import { ReadCoordinator, type Reader } from './coordinator.ts';
 import { validateRedditUrl } from './security.ts';
-export function createApp(service = new BrowserService()) {
+export function createApp(service: Reader = new BrowserService()) {
+  const coordinator = new ReadCoordinator(service);
   const app = express();
   app.disable('x-powered-by');
   app.use(
@@ -28,7 +30,6 @@ export function createApp(service = new BrowserService()) {
     }),
   );
   app.use(express.json({ limit: '4kb' }));
-  const cache = new Map<string, { expires: number; data: Discussion }>();
   const limiter = rateLimit({
     windowMs: 60000,
     limit: 10,
@@ -74,18 +75,13 @@ export function createApp(service = new BrowserService()) {
       });
       return;
     }
-    let key: string;
+
     try {
-      key = validateRedditUrl(parsed.data.url).href + ':' + parsed.data.viewport;
+      validateRedditUrl(parsed.data.url);
     } catch {
       res.status(400).json({
         error: { code: 'invalid_url', message: 'Paste an HTTPS Reddit thread or subreddit URL.' },
       });
-      return;
-    }
-    const cached = cache.get(key);
-    if (cached && cached.expires > Date.now()) {
-      res.json(cached.data);
       return;
     }
     const controller = new AbortController();
@@ -94,21 +90,17 @@ export function createApp(service = new BrowserService()) {
       if (!res.writableEnded) controller.abort();
     });
     try {
-      const data = await service.read(parsed.data, controller.signal);
-      if (
-        ['public', 'partial', 'promotional_overlay'].includes(data.status) &&
-        (data.post || data.listing.length)
-      ) {
-        for (const [k, v] of cache) if (v.expires < Date.now()) cache.delete(k);
-        if (cache.size >= 30) cache.delete(cache.keys().next().value!);
-        cache.set(key, { expires: Date.now() + 60000, data });
-      }
+      const result = await coordinator.read(parsed.data, controller.signal);
+      const { data } = result;
+      res.setHeader('X-Threadglass-Cache', result.cache);
+      if (result.retryAfterSeconds) res.setHeader('Retry-After', result.retryAfterSeconds);
       console.info(
         JSON.stringify({
           id,
           event: 'read',
           status: data.status,
           comments: data.evidence.renderedComments,
+          cache: result.cache,
           elapsedMs: Date.now() - started,
         }),
       );
@@ -121,6 +113,7 @@ export function createApp(service = new BrowserService()) {
       console.error(
         JSON.stringify({ id, event: 'read_error', code: e.code, elapsedMs: Date.now() - started }),
       );
+      if (e.code === 'busy') res.setHeader('Retry-After', '1');
       if (!res.destroyed)
         res
           .status(e.httpStatus)
@@ -137,7 +130,7 @@ export function createApp(service = new BrowserService()) {
       res.status(400).json({ error: { code: 'bad_request', message: 'Invalid request.' } });
     },
   );
-  return { app, close: () => service.close() };
+  return { app, close: () => coordinator.close() };
 }
 if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve('server/index.ts')) {
   const { app, close } = createApp();
