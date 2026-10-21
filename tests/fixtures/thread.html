@@ -1,0 +1,78 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Fixture discussion</title>
+  </head>
+  <body>
+    <shreddit-post
+      id="t3_fixture"
+      post-title="Why does a conversation need room to breathe?"
+      author="curious_reader"
+      subreddit-prefixed-name="r/explainlikeimfive"
+      created-timestamp="2024-01-12T10:30:00Z"
+      score="1248"
+      comment-count="3"
+      permalink="/r/explainlikeimfive/comments/fixture/room/"
+      is-archived="true"
+      is-locked="true"
+    >
+      <div slot="text-body">
+        <p>
+          This is a <strong>synthetic test fixture</strong>, never a retrieved Reddit discussion.
+        </p>
+        <p>How do nested replies keep their context?</p>
+        <pre><code>const conversation = { context: true };</code></pre>
+        <table>
+          <tr>
+            <th>Mode</th>
+            <th>Browser</th>
+          </tr>
+          <tr>
+            <td>Remote</td>
+            <td>Chromium</td>
+          </tr>
+        </table>
+      </div></shreddit-post
+    >
+    <shreddit-comment
+      thingid="t1_first"
+      author="thoughtful_person"
+      score="982"
+      depth="0"
+      permalink="/r/explainlikeimfive/comments/fixture/room/first/"
+      created="2024-01-12T11:00:00Z"
+      ><div slot="comment">
+        <p>Context helps you follow the thought. Each reply belongs to the comment it answers.</p>
+        <blockquote><p>The shape of a conversation carries meaning.</p></blockquote>
+      </div>
+      <shreddit-comment
+        thingid="t1_child"
+        parentid="t1_first"
+        author="[deleted]"
+        score="124"
+        depth="1"
+        ><div slot="comment">
+          <p>A nested reply, with a <a href="https://example.com">reference</a>.</p>
+          <details>
+            <summary>Spoiler</summary>
+            The structure matters.
+          </details>
+        </div>
+        <shreddit-comment
+          thingid="t1_deep"
+          parentid="t1_child"
+          author="one_more_thought"
+          score="38"
+          depth="2"
+          ><div slot="comment">
+            <p>And a third level, so the conversation stays intact.</p>
+          </div></shreddit-comment
+        ></shreddit-comment
+      ></shreddit-comment
+    >
+    <div role="dialog" aria-label="Use our app">
+      <p>Open in app for a better experience</p>
+      <button onclick="this.parentElement.remove()">Continue in browser</button>
+    </div>
+  </body>
+</html>

@@ -1,0 +1,51 @@
+{
+  "name": "threadglass",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "A browser-powered reader for publicly available Reddit discussions",
+  "license": "MIT",
+  "engines": {
+    "node": ">=22.12"
+  },
+  "scripts": {
+    "dev": "concurrently -k 'tsx watch server/index.ts' 'vite --host 127.0.0.1'",
+    "build": "tsc --noEmit && vite build && node --import tsx scripts/build-userscript.ts && npm run licenses -- --write-notices",
+    "start": "node --import tsx server/index.ts",
+    "test": "vitest run",
+    "test:e2e": "playwright test",
+    "test:live": "node --import tsx scripts/live.ts",
+    "check": "npm test && npm run build",
+    "licenses": "node --import tsx scripts/licenses.ts",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "dependencies": {
+    "dompurify": "^3.3.0",
+    "express": "^5.1.0",
+    "express-rate-limit": "^8.0.0",
+    "helmet": "^8.1.0",
+    "ipaddr.js": "^2.2.0",
+    "playwright": "1.63.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "sanitize-html": "^2.17.0",
+    "zod": "^4.0.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.63.0",
+    "@types/express": "^5.0.0",
+    "@types/node": "^24.0.0",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "@types/sanitize-html": "^2.16.0",
+    "@vitejs/plugin-react": "^6.0.0",
+    "concurrently": "^9.2.0",
+    "esbuild": "^0.28.0",
+    "prettier": "^3.9.10",
+    "tsx": "^4.20.0",
+    "typescript": "^6.0.0",
+    "vite": "8.3.4",
+    "vitest": "5.0.5"
+  }
+}
